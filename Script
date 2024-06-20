@@ -1,0 +1,309 @@
+# Static variable declarations
+$script:PROJECT_FOLDER_NAME = ".\Spring 2024 Project Directory"
+$script:MOVIE_DATA_FILE = ".\p3_dev_data.csv"
+$script:TOP_SCORES = 3
+
+function Setup {
+    $user_path = "C:\Users\" + $env:UserName + "\Desktop"
+    Set-Location $user_path
+    # Make or remake the main folder structure
+    if (Test-Path $script:PROJECT_FOLDER_NAME) {
+        # Remove the directory if it exists
+        Remove-Item $script:PROJECT_FOLDER_NAME -Recurse -Force | Out-Null
+    }
+
+    # Create the project directory
+    New-Item -Path $script:PROJECT_FOLDER_NAME -ItemType Directory | Out-Null
+
+    # Check for the project file
+    if (-Not (Test-Path $script:MOVIE_DATA_FILE)) {
+        Write-Host "Please put $env:MOVIE_DATA_FILE in the home directory then restart the script"
+        $input = Read-Host "Press Enter to continue"
+        exit
+    }
+    # Initialize the global array to store lines
+    $script:fileArray = @()
+    # Read the file, skipping lines containing 'belongs_to_collection'
+    foreach ($line in Get-Content $script:MOVIE_DATA_FILE) {
+        if ($line -eq "*belongs_to_collection*") {
+            continue
+        }
+        # Append each line as an array element to ensure an array of arrays
+        $script:fileArray += ,@($line)
+    }
+}
+
+function topx {
+    # Initialize arrays
+    $popularityTitleList = @()
+    $popList = @()
+    $top5List = @()
+    $topXMovies = @()
+
+    # Make path to the user desktop
+    $user_path = "C:\Users\$env:UserName\Desktop"
+    Set-Location $user_path
+
+    # Read file and collect genres
+    foreach ($line in Get-Content $script:MOVIE_DATA_FILE) {
+        $lineList = $line.split(',')
+        try {
+            $popularity = $lineList[10]
+            $title = $lineList[8]
+            if ($title -contains '*??*') {
+                continue
+            }
+        } catch {
+            # Ignore the error and continue execution
+            continue
+        }
+        if ($lineList[3] -ne "[]") {
+            $movieGenresList = $lineList[3].Split('\|')
+            for ($i = 1; $i -lt $movieGenresList.Length; $i += 2) {
+                $genreParts = $movieGenresList[$i].Split(':')
+                if ($genreParts.Length -gt 1) {
+                    $genre = $genreParts[1].Trim(" '}{]")
+                    if ($genre -eq $script:chosen_genre) {
+                        $popularityTitleList += "$popularity|$title" # Append popularity and title to the list, separated by '|'
+                    }
+                }
+            }
+        }
+    }
+    foreach ($item in $popularityTitleList) {
+        $poptitle = $item.Split('|')
+        try {
+            $popfloat = [float]$poptitle[0]
+            $popList += $popfloat
+        } catch {
+            continue
+        }
+    }
+    $popList = $popList | Sort-Object -Descending
+
+    #take only the top x popularity scores. Change TOP_SCORES as desired
+    for ($i = 0; $i -lt $script:TOP_SCORES; $i++) {
+        try {
+            $top3List += $popList[$i]
+        } catch {
+            continue
+        }
+    }
+    foreach ($topxpop in $top3List) {
+        foreach ($j in $popularityTitleList) {
+            $poptitle = $j.split('|')
+            $moviePop = $poptitle[0]
+            if ($topxpop -eq $moviePop) {
+                $topXMovies += $poptitle[1]
+            }
+        }
+    }
+    $topXMovies = $topXMovies | Sort-Object
+
+    #Clear the screen
+    cls
+
+    # Define the header
+    $header = "Top $($script:TOP_MOVIES) $chosen_genre Movies"
+
+    # Print the header
+    Write-Host $header
+
+    #variable underline
+    for ($j = 0; $j -lt $header.Length; $j++) {
+        Write-Host "-" 
+    }
+    #Create a new line
+    Write-Host
+
+    #print the movies
+    foreach ($i in $topXMovies) {
+        Write-Host $i
+    }
+
+    # Print message asking the user to press Enter to continue
+    Read-Host "`nPress Enter to continue"
+
+    # Clear the screen
+    cls
+}
+
+
+function option_1() {
+    cls
+    # Make path to the user desktop
+    $user_path = "C:\Users\$env:UserName\Desktop"
+    Set-Location $user_path
+
+    # Define an empty array to store unique genres
+    $script:genre_array = @()
+
+    # Read and process each line in the movie data file
+    foreach ($line in Get-Content $script:MOVIE_DATA_FILE) {
+        $lineList = $line.Split(",")
+        if ($lineList[3] -ne "[]") {
+            $genreSplitLineList = $lineList[3].split('\|')
+            for ($i = 1; $i -lt $genreSplitLineList.Length; $i += 2) {
+                $genreParts = $genreSplitLineList[$i].Split(':')
+                if ($genreParts.Length -gt 1) {
+                    $item = $genreParts[1].Trim(" '}{]")
+                    if ($item -notin $script:genre_array) {
+                        $script:genre_array += $item
+                    }
+                }
+            }
+        }
+    }
+    $script:genre_array = $script:genre_array | Sort-Object -Unique
+
+    cls
+
+    # Display the available genres and the number of movies found
+    Write-Host "Available Genres (Number of Movies Found)"
+    Write-Host "-----------------------------------------"
+    for ($i = 0; $i -lt $script:genre_array.Count; $i++) {
+        $count = 0
+        foreach ($line in Get-Content $script:MOVIE_DATA_FILE) {
+            $lineList = $line.Split(",")
+            if ($lineList[3] -ne "[]") {
+                $genreSplitLineList = $lineList[3].split('\|')
+                for ($h = 1; $h -lt $genreSplitLineList.Length; $h += 2) {
+                    $genreParts = $genreSplitLineList[$h].Split(':')
+                    if ($genreParts.Length -gt 1) {
+                        $item = $genreParts[1].Trim(" '}{]")
+                        if ($item -eq $script:genre_array[$i]) {
+                            $count += 1
+                        }
+                    }
+                }
+            }
+        }
+        # Output formatting with alignment for 1-9
+        if ($i -lt 9) {
+            Write-Host " $($i + 1) $($script:genre_array[$i]) ($count)"
+        } else {
+            Write-Host "$($i + 1) $($script:genre_array[$i]) ($count)"
+        }
+    }
+
+    while ($true) {  
+        try {
+                # Ask the user for input
+                [int]$genre_number = Read-Host "`nPlease enter the number shown to the left of each genre to see the top $($script:TOP_SCORES) movies for that genre, or enter zero to exit"
+
+                # Check if the user wants to exit
+                if ($genre_number -eq 0) {
+                    break
+                }
+                # Access the chosen genre based on user input, adjusted for zero-based indexing
+                [string]$script:chosen_genre = $genre_array[$genre_number - 1]
+
+                # Call the function that handles the chosen genre
+                topx $script:chosen_genre
+                break
+        }
+        catch {
+            # Clear the console similar to cls
+            Clear-Host
+
+            # Print an error message and reset
+            Read-Host "That is not a valid selection. Press Enter to try again."
+            continue
+        }
+    }
+}
+
+
+
+
+function option_2 {
+    Get-Location
+    Set-Location "C:\Users\jonat\Desktop\Spring 2024 Project Directory"
+    
+
+    # Loop through each decade from the 1920s to the 2020s
+    for ($c = 192; $c -le 202; $c++) {
+        $flag = 0
+        $filename = "$c" + "0s Movies.csv"
+        # Initialize the CSV file with headers
+        Write-Output "Movie Title, Run Time, Release Date" | Out-File $filename -encoding ascii
+
+        # Iterate over each element in the file array
+        foreach ($item in $script:fileArray) {
+            $fields = $item -split ','
+            $date = $fields[14]  # Assuming date is in the 15th column (0-indexed)
+            $runtime = $fields[16]  # Assuming runtime is in the 17th column (0-indexed)
+            $title = $fields[8]  # Assuming title is in the 9th column (0-indexed)
+            $title = $title.Replace("^", " ")
+            $date_match = [int]$date.Substring($date.Length - 4, 3)
+
+
+            if ($date_match -eq $c) {
+                Write-Output "$title,$runtime,$date" | Out-File $filename -encoding ascii -Append
+                 $flag = 1
+            }
+        }
+        
+        # If flag is zero delete that file
+        if ($flag -eq 0) {
+            Remove-Item $filename
+        }
+        
+    }
+
+    # Return to the user's home directory
+    Set-Location "C:\Users\jonat\Desktop"
+}
+
+function option_3 {
+    Get-Location
+    Set-Location "C:\Users\jonat\Desktop\Spring 2024 Project Directory"
+
+    #Make a zip file of the csv in the archives subdirectory
+    $zipfile = @{
+        Path = "*.csv"
+        CompressionLevel = "Fastest"
+        DestinationPath = ".\decades"
+    }
+    Compress-Archive @zipfile -Force
+
+    del .\*.csv
+
+    Set-Location "C:\Users\jonat\Desktop"
+
+    $sourceFilePath = "C:\Users\jonat\Desktop\p3_movie_data.csv"
+    $destinationFilePath = "C:\Users\jonat\Desktop\Spring 2024 Project Directory\p3_movie-data.csv"
+
+    Move-Item -Path $sourceFilePath -Destination $destinationFilePath
+
+}
+
+
+# Call the Setup function
+Setup
+
+while ($true) {
+    Clear-Host
+    Write-Host "----- MAIN MENU -----
+
+Please select from the following options:
+
+1.  Select Movie by Genre
+2.  Output Zipped Files of Movies by Decade
+3.  Clean up and exit
+"
+
+    $userMenuChoice = Read-Host "Option# "
+
+    if ($userMenuChoice -eq '1') {
+        option_1
+    } elseif ($userMenuChoice -eq '2') {
+        option_2
+    } elseif ($userMenuChoice -eq '3') {
+        option_3
+        break
+    } else {
+        
+
+    }
+}
